@@ -1,9 +1,9 @@
-import os
-import shutil
-import time
-import cv2
 import numpy as np
-import algorithms as algorithms
+import cv2
+import pandas as pd
+import algorithms
+import time
+
 
 directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]
 is_print_matrix = True
@@ -212,38 +212,76 @@ def is_end(total_steps, current_steps):
     return current_steps >= total_steps
 
 
-# 消去两个方块的条件：
-# 1. 一个方块的上下左右有相同的方块
-# 2. 一个方块往上下左右移动后的位置的上下左右有相同的方块
-#
-# 移动的条件：
-# 如果要将一个方块向一个方向移动x格距离，那么该方块在那个方向连续的几个方块的那个方向必须有x格空位置
-#
-# 推箱子规则：
-# 将一个方块朝着一个方向移动x格距离，那么该方块该方向的相连的所有方块都需要移动x距离
-def game_start(matrix):
-    row = len(matrix)
-    column = len(matrix[0])
-    total_steps = int(row * column / 2)
-    current_steps = 0
-    while current_steps < total_steps:
-        for x in range(len(matrix)):
-            for y in range(len(matrix[0])):
-                if matrix[x][y] == -1:
-                    continue
-                for direction in directions:
-                    block = matrix[x][y]
-                    if block == -1:
-                        break
-                    distance = get_direction_distance(x, y, matrix, direction)
+def get_matrix(image_path, row, column, crop_width, crop_height, generate_image=False):
+    img1 = cv2.imread(image_path)
+    img1 = cv2.resize(img1, (450, 630), interpolation=cv2.INTER_AREA)
+    height = img1.shape[0]
+    width = img1.shape[1]
+    dx = height / row
+    dy = width / column
+    image_matrix = [[] for _ in range(row)]
 
-                    same_block = try_move_block(matrix, x, y, distance[0], distance[1], direction)
-                    if same_block is not None:
-                        current_steps += 1
-                        print_matrix(matrix, current_steps, [x, y], same_block)
-                        time.sleep(0)
-                        if is_end(total_steps, current_steps):
-                            return
+    for i in range(row):
+        for j in range(column):
+            x = int(dx * i)
+            y = int(dy * j)
+            next_x = int(x + dx)
+            next_y = int(y + dy)
+            clip = algorithms.round_clip(img1[x:next_x, y:next_y], crop_width, crop_height)
+            image_matrix[i].append(clip)
+    return image_matrix
+
+
+def csv_to_matrix(csv_file_path, rows=14, cols=10):
+    df = pd.read_csv(csv_file_path)
+    matrix = np.zeros((rows, cols), dtype=int)
+    icon_name_matrix = [[] for _ in range(rows)]
+    # icon_ch_name_matrix = [[] for _ in range(rows)]
+    icon_category_map = {}
+    category_index = 1
+    category_count = {}  # 用于统计每一个类别图标个数
+
+    for index, row in df.iterrows():
+        x, y, icon_name = row
+        icon_name = icon_name.strip()
+        if icon_name not in icon_category_map:
+            icon_category_map[icon_name] = category_index
+            category_index += 1
+            category_count[icon_name] = 0
+        matrix[y, x] = icon_category_map[icon_name]
+        icon_name_matrix[y].append(icon_name)
+        # icon_ch_name_matrix[y].append(ch_name)
+        category_count[icon_name] += 1  # 该类别的计数加1
+    num_categories = len(icon_category_map)
+    print(num_categories)
+    for key, value in category_count.items():
+        print(key, value)
+    return matrix, icon_name_matrix
+
+
+def visualize_matrix(matrix, category_images, micro_h=39, micro_w=39, crop_width=3, crop_height=3):
+    target_h = 14 * (micro_h + crop_height * 2)
+    target_w = 10 * (micro_w + crop_width * 2)
+    new_micro_h = micro_h + crop_height * 2
+    new_micro_w = micro_w + crop_width * 2
+    new_image = np.ones((target_h, target_w, 3), dtype=np.uint8) * np.array([0, 51, 153], dtype=np.uint8)
+
+    for y, row in enumerate(matrix):
+        for x, category_index in enumerate(row):
+            if category_index != -1:
+                new_image[y*new_micro_h+crop_height:(y+1)*new_micro_h-crop_height,
+                x*new_micro_w+crop_width:(x+1)*new_micro_w-crop_width, :] = category_images[category_index]
+
+    return new_image
+
+def get_category_images(matrix, image_matrix):
+    category_images = {}
+    for y in range(matrix.shape[0]):
+        for x in range(matrix.shape[1]):
+            if matrix[y, x] not in category_images:
+                category_images[matrix[y, x]] = image_matrix[y][x]
+    return category_images
+
 
 
 def print_split_line(width, start="", end=""):
@@ -282,21 +320,56 @@ def print_matrix(matrix, current_steps, point1=None, point2=None):
     print_split_line(len(matrix[0]) + 2, start="-  ", end="-")
 
 
-def visualize_matrix(matrix, current_steps, point1=None, point2=None):
 
-    pass
+def game_start(matrix, category_images):
+    row = len(matrix)
+    column = len(matrix[0])
+    total_steps = int(row * column / 2)
+    current_steps = 0
+    while current_steps < total_steps:
+        for x in range(len(matrix)):
+            for y in range(len(matrix[0])):
+                if matrix[x][y] == -1:
+                    continue
+                for direction in directions:
+                    block = matrix[x][y]
+                    if block == -1:
+                        break
+                    distance = get_direction_distance(x, y, matrix, direction)
+                    left_vis = visualize_matrix(matrix, category_images)
+                    same_block = try_move_block(matrix, x, y, distance[0], distance[1], direction)
+                    if same_block is not None:
+                        current_steps += 1
+                        print_matrix(matrix, current_steps, [x, y], same_block)
+                        right_vis = visualize_matrix(matrix, category_images)
+                        cv2.imshow('left_vis', left_vis)
+                        cv2.imshow('right_vis', right_vis)
+                        cv2.waitKey(0)
+                        time.sleep(0)
+                        if is_end(total_steps, current_steps):
+                            return
 
 
-def main():
-    image_path = "pictures/003.jpg"
-    row = 14
-    column = 10
-    crop_width = 3
-    crop_height = 3
-    matrix = get_matrix(image_path, row, column, crop_height, crop_width, True)
-    print_matrix(matrix, 0)
-    game_start(matrix)
+if __name__ == '__main__':
+    matrix, icon_name_matrix = csv_to_matrix('data/001.csv')
+    image_matrix = get_matrix('pictures/real001.jpg', 14, 10, 3, 3)
+    category_images = get_category_images(matrix, image_matrix)
+    print(matrix)
+    print(icon_name_matrix)
+    # print(icon_ch_name_matrix)
+    for idx, row in enumerate(icon_name_matrix):
+        print(idx, row)
+    for row in icon_name_matrix:
+        for col in row:
+            print(f"{col[:2]:>10}", end=' ')
+        print()
 
+    for key, value in category_images.items():
+        print(key, value.shape)
 
-if __name__ == "__main__":
-    main()
+    # new_image = visualize_matrix(matrix, category_images)
+    # cv2.imshow('matrix', new_image)
+    # cv2.waitKey(0)
+    # directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+    # is_print_matrix = True
+    game_start(matrix, category_images)

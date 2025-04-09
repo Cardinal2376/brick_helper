@@ -129,7 +129,7 @@ def is_similarity(image1, image2, debug=False):
     hist_with_split_rs = normalize_compared_hist_with_split(image1, image2)
     if debug:
         print("hist_with_split: %s, ssim: %s, phash: %s" % (hist_with_split_rs, ssim, phash))
-    return hist_with_split_rs >= 0.8 or ssim > 0.7 or (hist_with_split_rs > 0.7 and phash > 0.89 and ssim > 0.2)
+    return hist_with_split_rs >= 0.83 or ssim > 0.7 or (hist_with_split_rs > 0.7 and phash > 0.89 and ssim > 0.3)
 
 
 def compare_a_hash(image1, image2):
@@ -159,28 +159,32 @@ def runAllImageSimilaryFun(para1, para2, crop_width, crop_height):
     img2 = round_clip(cv2.imread(para2), crop_width, crop_height)
     print(is_similarity(img1, img2, True))
 
-    n1 = compare_a_hash(img1, img2);
+    n1 = compare_a_hash(img1, img2)
     print('均值哈希算法相似度aHash：', n1)
 
     n2 = compare_d_hash(img1, img2)
     print('差值哈希算法相似度dHash：', n2)
 
-    n3 = compare_p_hash(img1, img2)
+    n3 = compare_p_hash(img1, img2) # 0.89
     print('感知哈希算法相似度pHash：', n3)
 
-    n4 = normalize_compared_hist_with_split(img1, img2)
+    n4 = normalize_compared_hist_with_split(img1, img2) # 0.83
     print('三直方图算法相似度：', n4)
 
     n5 = compare_hist_with_split(img1, img2)
     print("单通道的直方图", n5)
 
-    ssim1 = compare_ssim(img1, img2)
+    ssim1 = compare_ssim(img1, img2) # 0.2
     print('ssim: ', ssim1)
     print("%d %d %d %.2f %.2f " % (n1, n2, n3, round(n4[0], 2), n5[0]))
-    print("aHash: %.2f, dHash: %.2f, pHash: %.2f, 三直方图: %.2f, 单通道: %.2f, ssim: %.2f" %
-          n1, 1 - float(n2 / 64), n3, round(n4[0], 2), n5[0], ssim1)
+    print("aHash: %.2f, dHash: %.2f, pHash: %.2f, 三直方图: %.2f, "
+          "单通道: %.2f, ssim: %.2f" % (n1, 1 - float(n2 / 64), n3, round(n4[0], 2), n5[0], ssim1))
+    phash = compare_p_hash(img1, img2)
+    ssim = compare_ssim(img1, img2)
+    hist_with_split_rs = normalize_compared_hist_with_split(img1, img2)
+    print(hist_with_split_rs >= 0.83,  ssim > 0.7, (hist_with_split_rs > 0.7 and phash > 0.89 and ssim > 0.3))
 
 
 if __name__ == "__main__":
-    runAllImageSimilaryFun("target/category/35.png", "target/category/36.png")
-    runAllImageSimilaryFun("target/category/34.png", "target/grouped/34/107.png", 3, 3)
+    # runAllImageSimilaryFun("target/category/35.png", "target/category/36.png")
+    runAllImageSimilaryFun("target/category/1.png", "target/category/41.png", 3, 3)
