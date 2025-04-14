@@ -1,0 +1,8 @@
+sensenova
+numpy
+pandas
+opencv-python
+pyautogui
+tqdm
+openai
+volcengine-python-sdk[ark]

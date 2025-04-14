@@ -5,7 +5,7 @@ import time
 import pyautogui
 import datetime
 from tqdm import tqdm
-from gpt import get_decription_csv, get_decription_csv_sensenova
+from gpt import get_decription_csv, get_decription_csv_sensenova, merge_csv_files
 from common import csv_to_matrix
 pyautogui.FAILSAFE = True  # 启用安全措施
 
@@ -385,15 +385,24 @@ def game_pipeline():
     new_image = opencv_image[y_min:y_max, x_min:x_max]
     cv2.imwrite(f'data/debug_{timestamp}.jpg', new_image)
     print(f"Debug image saved.")
-    for i in range(2):
-        for j in range(2):
-            new_image = opencv_image[y_min + (y_max - y_min) // 2 * i:y_min + (y_max - y_min) // 2 * (i+1),
-                        x_min + (x_max - x_min) // 2 * i:x_min + (x_max - x_min) // 2 * (i+1)]
-            cv2.imwrite(f'data/debug_{timestamp}_{i}_{j}.jpg', new_image)
-            print(f"{i} {j} Debug image saved.")
+
 
     # get_decription_csv(f'data/debug_{timestamp}.jpg', f'data/content_{timestamp}.csv')
-    get_decription_csv_sensenova(f'data/debug_{timestamp}.jpg', f'data/content_{timestamp}.csv')
+    gpt_split = True
+    if gpt_split:
+        csv_file_list = []
+        for i in range(2):
+            for j in range(2):
+                new_image = opencv_image[y_min + (y_max - y_min) // 2 * i:y_min + (y_max - y_min) // 2 * (i + 1),
+                            x_min + (x_max - x_min) // 2 * i:x_min + (x_max - x_min) // 2 * (i + 1)]
+                cv2.imwrite(f'data/debug_{timestamp}_{i}_{j}.jpg', new_image)
+                print(f"{i} {j} Debug image saved.")
+                get_decription_csv_sensenova(f'data/debug_{timestamp}_{i}_{j}.jpg',
+                                             f'data/content_{timestamp}_{i}_{j}.csv')
+                csv_file_list.append(f'data/content_{timestamp}_{i}_{j}.csv')
+        merge_csv_files(csv_file_list, f"data/content_{timestamp}.csv")
+    else:
+        get_decription_csv_sensenova(f'data/debug_{timestamp}.jpg', f'data/content_{timestamp}.csv')
     matrix, icon_name_matrix = csv_to_matrix(f'data/content_{timestamp}.csv')
     image_matrix = get_matrix(f'data/debug_{timestamp}.jpg',
                               14, 10, 3, 3)

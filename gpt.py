@@ -6,6 +6,7 @@ import mimetypes
 from openai import OpenAI
 import json
 import time
+import pandas as pd
 from common import csv_to_matrix
 
 
@@ -146,8 +147,8 @@ def get_decription_csv_sensenova(image_path, output_file_name):
     # if status == 'VALID':
     # 从环境变量中获取 API_TOKEN
     base64_image = encode_image(image_path)
-    # model_id = "SenseNova-V6-Pro"
-    model_id = "SenseNova-V6-Reasoner"
+    model_id = "SenseNova-V6-Pro"
+    # model_id = "SenseNova-V6-Reasoner"
     # model_id = "SenseChat-5-1202"
     API_TOKEN = os.getenv('SENSECHAT_API_KEY')
 
@@ -299,10 +300,30 @@ def get_description_sensenova_v2(image_path, output_file_name):
         sys.stdout.flush()
 
 
+def merge_csv_files(file_names, output_file_name):
+    dfs = []
+    x_offset = [0, 5, 0, 5]
+    y_offset = [0, 0, 7, 7]
+    for idx, file_name in enumerate(file_names):
+        df = pd.read_csv(file_name, encoding='utf-8')
+        df['位置 x'] = df['位置 x'] + x_offset[idx]
+        df['位置 y'] = df['位置 y'] + y_offset[idx]
+        dfs.append(df)
+    df = pd.concat(dfs)
+    df.to_csv(output_file_name, index=False, encoding="utf-8")
+
+
+
+
 if __name__ == '__main__':
     # get_decription_csv("")
     # get_description_sensenova_v2("data/debug_split_0_0.jpg", "data/sensenova1.csv")
-    get_decription_csv_sensenova("data/debug_split_0_0.jpg", "data/sensenova1.csv")
+    # get_decription_csv_sensenova("data/debug_split_0.jpg", "data/sensenova_0.csv")
+    # get_decription_csv_sensenova("data/debug_split_1.jpg", "data/sensenova_1.csv")
+    # get_decription_csv_sensenova("data/debug_split_2.jpg", "data/sensenova_2.csv")
+    # get_decription_csv_sensenova("data/debug_split_3.jpg", "data/sensenova_3.csv")
+    merge_csv_files(["data/sensenova_0.csv", "data/sensenova_1.csv", "data/sensenova_2.csv", "data/sensenova_3.csv"
+                     ], "data/sensenova_merged.csv")
     # matrix, icon_name_matrix = csv_to_matrix("data/sensenova1.csv")
     # print(matrix)
     # print(icon_name_matrix)
