@@ -288,7 +288,7 @@ def visualize_matrix(matrix, current_steps, point1=None, point2=None):
 
 
 def main():
-    image_path = "pictures/003.jpg"
+    image_path = "data/003.jpg"
     row = 14
     column = 10
     crop_width = 3

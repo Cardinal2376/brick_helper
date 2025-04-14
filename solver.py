@@ -2,35 +2,21 @@ import numpy as np
 import cv2
 import pandas as pd
 import time
+import pyautogui
+import datetime
+from tqdm import tqdm
+from gpt import get_decription_csv, get_decription_csv_sensenova
+from common import csv_to_matrix
+pyautogui.FAILSAFE = True  # 启用安全措施
 
 # 定义上下左右四个方向
 directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]
 is_print_matrix = True
 
-# 将CSV文件转换为矩阵
-def csv_to_matrix(csv_file_path, rows=14, cols=10):
-    df = pd.read_csv(csv_file_path)
-    matrix = np.zeros((rows, cols), dtype=int)
-    icon_name_matrix = [[] for _ in range(rows)]
-    icon_category_map = {}
-    category_index = 1
-    category_count = {}  # 用于统计每一个类别图标个数
 
-    for index, row in df.iterrows():
-        x, y, icon_name = row
-        icon_name = icon_name.strip()
-        if icon_name not in icon_category_map:
-            icon_category_map[icon_name] = category_index
-            category_index += 1
-            category_count[icon_name] = 0
-        matrix[y, x] = icon_category_map[icon_name]
-        icon_name_matrix[y].append(icon_name)
-        category_count[icon_name] += 1  # 该类别的计数加1
-    num_categories = len(icon_category_map)
-    print(num_categories)
-    for key, value in category_count.items():
-        print(key, value)
-    return matrix, icon_name_matrix
+# 将CSV文件转换为矩阵
+
+
 
 # 获取矩阵中每个方块的图像
 def get_matrix(image_path, row, column, crop_width, crop_height, generate_image=False):
@@ -193,6 +179,7 @@ def find_same_block(matrix, x, y, nx, ny, block):
                 break
     return None
 
+
 # 移动方块
 def move_block(matrix, x, y, dx, dy, direction):
     if dx == 0 and dy == 0:
@@ -205,6 +192,7 @@ def move_block(matrix, x, y, dx, dy, direction):
         matrix[current_x][current_y] = -1
         current_x = current_x - direction[0]
         current_y = current_y - direction[1]
+
 
 # 判断是否被阻挡
 def is_blocked(matrix, x, y, same_block, direction):
@@ -224,6 +212,7 @@ def is_blocked(matrix, x, y, same_block, direction):
             else:
                 break
     return False
+
 
 # 尝试移动方块
 def try_move_block(matrix, x, y, dx, dy, direction):
@@ -263,13 +252,15 @@ def try_move_block(matrix, x, y, dx, dy, direction):
             return new_matrix, same_block, move_x, move_y
     return None, None, None, None
 
+
 # 获取矩阵的哈希值
 def get_matrix_hash(matrix):
     return hash(matrix.tostring())
 
+
 # DFS + 记忆化搜索
 min_steps = float('inf')
-max_tries = 1e2
+max_tries = 2e4
 min_path = []
 visited = set()
 tries = 0
@@ -277,7 +268,7 @@ tries = 0
 def dfs(matrix, path, steps):
     global min_steps, min_path, visited, tries
     tries += 1
-    print(tries, np.sum(matrix != -1), min_steps)
+    # print(tries, np.sum(matrix != -1), min_steps)
     matrix_hash = get_matrix_hash(matrix)
     if min_steps != float('inf'):
         return
@@ -322,18 +313,33 @@ def dfs(matrix, path, steps):
                         new_path = path + [((x, y), same_block, (move_x, move_y))]
                         dfs(new_matrix, new_path, steps + 1)
 
+
 # 游戏开始
-def game_start(matrix, category_images):
-    global min_steps, min_path
+def game_start(matrix, category_images, visualize, mouse_control):
+    global min_steps, min_path, tries
     dfs(matrix, [], 0)
     if min_steps == float('inf'):
         print("No solution found.")
         return
+    else:
+        print(f"Solution Found Step {min_steps} Tried {tries}")
+        print("Path: ", min_path)
 
     current_steps = 0
-    print("Min Path Steps:", min_steps)
-    print("Min Path:", min_path)
-    for (x, y), same_block, (move_x, move_y) in min_path:
+    # x_min = 400 * 2
+    x_min = 40
+    x_max = x_min + 1840 - 1096
+    # y_min = 232 * 2
+    y_min = 330
+    y_max = y_min + 1468 - 416
+    x_gap = (x_max - x_min) / 10
+    y_gap = (y_max - y_min) / 14
+
+    if mouse_control:
+        pyautogui.click((x_min + x_gap // 2) // 2, (y_min - y_gap // 2) // 2, button='left')
+        time.sleep(0.1)
+
+    for (x, y), same_block, (move_x, move_y) in tqdm(min_path):
         current_steps += 1
         left_vis = visualize_matrix(matrix, category_images, (x, y), (x+move_x, y+move_y), same_block)
         matrix[same_block[0]][same_block[1]] = -1
@@ -342,29 +348,71 @@ def game_start(matrix, category_images):
         move_x = int(move_x)
         move_y = int(move_y)
         direction = [move_x // abs(move_x) if move_x != 0 else move_x, move_y // abs(move_y) if move_y != 0 else move_y]
-        print((x, y), same_block, (move_x, move_y), direction)
+        # print((x, y), same_block, (move_x, move_y), direction)
+        # x hang y lie
         move_block(matrix, x, y, move_x, move_y, direction)
-        print_matrix(matrix, current_steps, [x, y], same_block)
-        right_vis = visualize_matrix(matrix, category_images)
-        cv2.imshow('left_vis', left_vis)
-        cv2.imshow('right_vis', right_vis)
-        cv2.waitKey(0)
-        time.sleep(0)
+        if visualize:
+            print_matrix(matrix, current_steps, [x, y], same_block)
+            right_vis = visualize_matrix(matrix, category_images)
+            cv2.imshow('left_vis', left_vis)
+            cv2.imshow('right_vis', right_vis)
+            cv2.waitKey(0)
+            time.sleep(0)
+        if mouse_control:
+            pyautogui.moveTo((x_min + x_gap * y + x_gap // 2) // 2, (y_min + y_gap * x + y_gap // 2) // 2,
+                             duration=0.2)
+            pyautogui.mouseDown()
+            pyautogui.moveTo((x_min + x_gap * (y + move_y) + x_gap // 2) // 2, (y_min + y_gap * (x + move_x) + y_gap // 2) // 2,
+                             duration=0.2)
+            pyautogui.mouseUp()
+            pyautogui.click((x_min + x_gap * same_block[1] + x_gap // 2) // 2, (y_min + y_gap * same_block[0] + y_gap // 2) // 2, button='left')
+            time.sleep(0.1)
 
-if __name__ == '__main__':
-    matrix, icon_name_matrix = csv_to_matrix('data/r01.csv')
-    image_matrix = get_matrix('pictures/r01_short.jpg', 14, 10, 3, 3)
+
+def game_pipeline():
+    now = datetime.datetime.now()
+    timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+    screenshot = pyautogui.screenshot()
+    screenshot_np = np.array(screenshot)
+    opencv_image = cv2.cvtColor(screenshot_np, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(f'data/screen_{timestamp}.png', opencv_image)
+    print("Screen shot saved.")
+
+    x_min = 40
+    x_max = x_min + 1840 - 1096
+    y_min = 330
+    y_max = y_min + 1468 - 416
+    new_image = opencv_image[y_min:y_max, x_min:x_max]
+    cv2.imwrite(f'data/debug_{timestamp}.jpg', new_image)
+    print(f"Debug image saved.")
+    for i in range(2):
+        for j in range(2):
+            new_image = opencv_image[y_min + (y_max - y_min) // 2 * i:y_min + (y_max - y_min) // 2 * (i+1),
+                        x_min + (x_max - x_min) // 2 * i:x_min + (x_max - x_min) // 2 * (i+1)]
+            cv2.imwrite(f'data/debug_{timestamp}_{i}_{j}.jpg', new_image)
+            print(f"{i} {j} Debug image saved.")
+
+    # get_decription_csv(f'data/debug_{timestamp}.jpg', f'data/content_{timestamp}.csv')
+    get_decription_csv_sensenova(f'data/debug_{timestamp}.jpg', f'data/content_{timestamp}.csv')
+    matrix, icon_name_matrix = csv_to_matrix(f'data/content_{timestamp}.csv')
+    image_matrix = get_matrix(f'data/debug_{timestamp}.jpg',
+                              14, 10, 3, 3)
     category_images = get_category_images(matrix, image_matrix)
     print(matrix)
     print(icon_name_matrix)
-    for idx, row in enumerate(icon_name_matrix):
-        print(idx, row)
     for row in icon_name_matrix:
         for col in row:
-            print(f"{col[:2]:>10}", end=' ')
+            print(f"{col[:3]:>8}", end=' ')
         print()
 
-    for key, value in category_images.items():
-        print(key, value.shape)
+    # for key, value in category_images.items():
+    #     print(key, value.shape)
 
-    game_start(matrix, category_images)
+    visualize = False
+    mouse_control = True
+    game_start(matrix, category_images, visualize, mouse_control)
+    print("Game Success!")
+
+
+if __name__ == '__main__':
+    game_pipeline()
