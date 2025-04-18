@@ -6,3 +6,5 @@ pyautogui
 tqdm
 openai
 volcengine-python-sdk[ark]
+torch
+torchvision

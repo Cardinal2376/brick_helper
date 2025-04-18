@@ -30,9 +30,11 @@ def get_decription_csv(image_path, output_file_name):
 
     with open("template.txt", "r") as f:
         prompt1 = f.read()
+    model="ep-20250412201458-dqvzm"
+    # model="doubao-1-5-thinking-pro-250415"
     response = client.chat.completions.create(
         # 指定您创建的方舟推理接入点 ID，此处已帮您修改为您的推理接入点 ID
-        model="ep-20250412201458-dqvzm",
+        model=model,
         messages=[
             {
                 "role": "user",
@@ -316,14 +318,14 @@ def merge_csv_files(file_names, output_file_name):
 
 
 if __name__ == '__main__':
-    # get_decription_csv("")
+    get_decription_csv("pictures/real001.jpg", "data/doubao.csv")
     # get_description_sensenova_v2("data/debug_split_0_0.jpg", "data/sensenova1.csv")
     # get_decription_csv_sensenova("data/debug_split_0.jpg", "data/sensenova_0.csv")
     # get_decription_csv_sensenova("data/debug_split_1.jpg", "data/sensenova_1.csv")
     # get_decription_csv_sensenova("data/debug_split_2.jpg", "data/sensenova_2.csv")
     # get_decription_csv_sensenova("data/debug_split_3.jpg", "data/sensenova_3.csv")
-    merge_csv_files(["data/sensenova_0.csv", "data/sensenova_1.csv", "data/sensenova_2.csv", "data/sensenova_3.csv"
-                     ], "data/sensenova_merged.csv")
+    # merge_csv_files(["data/sensenova_0.csv", "data/sensenova_1.csv", "data/sensenova_2.csv", "data/sensenova_3.csv"
+    #                  ], "data/sensenova_merged.csv")
     # matrix, icon_name_matrix = csv_to_matrix("data/sensenova1.csv")
     # print(matrix)
     # print(icon_name_matrix)
