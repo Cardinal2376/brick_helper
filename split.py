@@ -2,33 +2,10 @@ import time
 
 import cv2
 # import pyautogui
-from solver import get_matrix
+from solver import get_matrix, extract_feature, cosine_similarity, get_categority_csv
 import numpy as np
-import torch
-import torchvision.models as models
-from torchvision import transforms
 
 
-model = models.mobilenet_v3_small(pretrained=True)
-model.eval()
-preprocess = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
-
-
-def extract_feature(image):
-    """使用CNN提取特征向量"""
-    img_tensor = preprocess(image).unsqueeze(0)
-    with torch.no_grad():
-        features = model(img_tensor)
-    return features.squeeze().numpy()
-
-def cosine_similarity(vec1, vec2):
-    rtn = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-    return rtn
 
 
 def split():
@@ -122,37 +99,8 @@ def combined_hash(image):
     return d + c  # 合并为长哈希
 
 
-def get_categority_csv(image_path, csv_path):
-    image_matrix, img1 = get_matrix(image_path,
-                                    14, 10, 3, 3)
-    catgeory_matrix = np.zeros((14, 10), dtype=int)
-    feature_matrix = [[] for _ in range(14)]
-    for i in range(14):
-        for j in range(10):
-            feature_matrix[i].append(extract_feature(image_matrix[i][j]))
-    category_cnt = 0
-    threshold = 0.98
-    for ki in range(14):
-        for kj in range(10):
-            if catgeory_matrix[ki][kj] == 0:
-                catgeory_matrix[ki][kj] = category_cnt + 1
-                category_cnt += 1
-                for i in range(14):
-                    for j in range(10):
-                        if catgeory_matrix[i][j] == 0 and cosine_similarity(feature_matrix[ki][kj],
-                                                                            feature_matrix[i][j]) > threshold:
-                            catgeory_matrix[i][j] = catgeory_matrix[ki][kj]
-
-    with open(csv_path, 'w') as f:
-        f.write('位置x,位置y,名称\n')
-        for ki in range(14):
-            for kj in range(10):
-                f.write(f"{kj},{ki},C{catgeory_matrix[ki][kj]:03d}\n")
-    print(f"csv written at {csv_path}")
-
-
 def split_images():
-    image_matrix, img1 = get_matrix(f'data/debug_2025-04-13_13-13-51.jpg',
+    image_matrix, img1 = get_matrix(f'data/debug_2025-04-19_23-20-34.jpg',
                               14, 10, 3, 3)
     hash_matrix = [[] for _ in range(14)]
     for i in range(14):
@@ -167,13 +115,15 @@ def split_images():
     for ki in range(14):
         for kj in range(10):
             cur_img1 = img1.copy()
+            if not (ki == 2 and kj == 9):
+                continue
             print(f"ki {ki} kj {kj}")
             print('----' * 10)
             cnt = 0
             for i in range(14):
                 for j in range(10):
                     hamming_distance_matrix[i][j] = cosine_similarity(hash_matrix[ki][kj], hash_matrix[i][j])
-                    if hamming_distance_matrix[i][j] > 0.98:
+                    if hamming_distance_matrix[i][j] > 0.975:
                         cnt += 1
                         cv2.rectangle(cur_img1, (j * new_micro_w, i * new_micro_h),
                                       ((j + 1) * new_micro_w, (i + 1) * new_micro_h),
@@ -184,16 +134,16 @@ def split_images():
             print(f"ki {ki} kj {kj} cnt = {cnt}")
             cv2.imshow('img1', cur_img1)
             cv2.waitKey(0)
-
+    # cv2.imwrite("data/blank.jpg", image_matrix[3][3])
     # 7 8
-    # cv2.imshow("00", image_matrix[0][0])
-    # cv2.imshow("11", image_matrix[1][1])
+    # cv2.imshow("33", image_matrix[3][3])
+    # cv2.imshow("43", image_matrix[4][3])
     # cv2.imshow("12 9", image_matrix[12][9])
     # cv2.waitKey(0)
 
 if __name__ == '__main__':
-    get_categority_csv("data/debug_2025-04-13_13-13-51.jpg", "data/content_2025-04-13_13-13-51.csv")
-    # split_images()
+    # get_categority_csv("data/debug_2025-04-19_23-20-34.jpg", "data/content_1.csv")
+    split_images()
 
     # split()
     # mouse_control()

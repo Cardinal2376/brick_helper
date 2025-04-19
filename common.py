@@ -14,8 +14,11 @@ def csv_to_matrix(csv_file_path, rows=14, cols=10):
         x, y, icon_name = row
         icon_name = icon_name.strip()
         if icon_name not in icon_category_map:
-            icon_category_map[icon_name] = category_index
-            category_index += 1
+            if icon_name == "C-01":
+                icon_category_map[icon_name] = -1
+            else:
+                icon_category_map[icon_name] = category_index
+                category_index += 1
             category_count[icon_name] = 0
         matrix[y, x] = icon_category_map[icon_name]
         icon_name_matrix[y].append(icon_name)
@@ -24,4 +27,6 @@ def csv_to_matrix(csv_file_path, rows=14, cols=10):
     print(num_categories)
     for key, value in category_count.items():
         print(key, value)
+        if value % 2 == 1:
+            raise Exception(f"Error Recognize at key {key} value {value}")
     return matrix, icon_name_matrix
