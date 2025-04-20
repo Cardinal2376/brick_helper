@@ -388,24 +388,28 @@ def sample_with_weights_unique(lst, weights, n):
 
 
 def dfs(matrix, path, steps):
-    global min_steps, min_path, visited, tries, last_time, global_visited
+    global min_steps, min_path, visited, tries, last_time
     tries += 1
-    if tries % 5000 == 0:
-        print(f"tries {tries}/{max_tries} visited {len(visited)} global visited {len(global_visited)} {tries/max_tries * 100:.2f}% Time Used: {time.time() - last_time:.2f}s")
-
+    # print(tries, np.sum(matrix != -1), min_steps)
+    # depth =
+    if tries % 1000 == 0:
+        print(f"tries {tries}/{max_tries} visited {len(visited)} {tries/max_tries * 100:.4f}% Time Used: {time.time() - last_time:.2f}s")
+    matrix_hash = get_matrix_hash(matrix)
     if min_steps != float('inf'):
-        return False
+        return
     if tries > max_tries:
-        return False
+        # print("tries exceed")
+        return
+    if matrix_hash in visited:
+        # print("visited")
+        return
+    visited.add(matrix_hash)
+
     if np.all(matrix == -1):
         if steps < min_steps:
             min_steps = steps
             min_path = path
-        return False
-    matrix_hash = get_matrix_hash(matrix)
-    if matrix_hash in visited or matrix_hash in global_visited:
-        return True
-    visited.add(matrix_hash)
+        return
 
     row, col = matrix.shape
 
@@ -445,7 +449,6 @@ def dfs(matrix, path, steps):
     # pending_list = sample_with_weights_unique(pending_list, weights=sample_weight, n=len(pending_list))
     random.shuffle(pending_list)
     # pending_list =
-    cur_finished = True
     for item in tqdm(pending_list, desc=f'depth={len(path)}', disable=tqdm_disable):
         (x, y), same_block, (move_x, move_y), direction = item
         new_matrix = matrix.copy()
@@ -462,13 +465,13 @@ def dfs(matrix, path, steps):
         new_matrix[same_block[0]][same_block[1]] = -1
         new_matrix[x + move_x][y + move_y] = -1
         # print(new_matrix)
-        # new_matrix_hash = get_matrix_hash(new_matrix)
-        next_finished = dfs(new_matrix, new_path, steps + 1)
-        cur_finished = next_finished and cur_finished
-    if cur_finished:
-        global_visited.add(matrix_hash)
-    return cur_finished
+        if get_matrix_hash(new_matrix) not in visited:
+            dfs(new_matrix, new_path, steps + 1)
+
+        # break
+
     # print(f"depth {len(path)} dfs cnt {len(pending_list)} tries {tries} max_tries {max_tries} set size {len(visited)}")
+
 
 
 # 游戏开始
@@ -477,7 +480,7 @@ def game_start(matrix, category_images, visualize, mouse_control):
     no_ans = True
     # seed_list = [24, 42, 13, 20, 100, 101, 102, 103, 104]
     seed_list = [1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 225, 16*16, 17*17, 18*18, 19*19, 20*20]
-    max_tries_list = [2.5e4]
+    max_tries_list = [3000, 10000]
     visited = set()
     global_visited = set()
     for max_tries_value in max_tries_list:

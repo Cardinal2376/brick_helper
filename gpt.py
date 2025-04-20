@@ -7,6 +7,7 @@ from openai import OpenAI
 import json
 import time
 import pandas as pd
+import cv2
 from common import csv_to_matrix
 
 
@@ -316,9 +317,108 @@ def merge_csv_files(file_names, output_file_name):
 
 
 
+def get_location_sensenova():
+    image_path = "pictures/20250412-151736.jpeg"
+    base64_image = encode_image(image_path)
+    model_id = "SenseNova-V6-Pro"
+    # model_id = "SenseNova-V6-Reasoner"
+    # model_id = "SenseChat-5-1202"
+    API_TOKEN = os.getenv('SENSECHAT_API_KEY')
+
+    with open("prompt_locator.txt", "r") as f:
+        prompt1 = f.read()
+    image = cv2.imread(image_path)
+    prompt1 += f" 上传图像的分辨率为: {image.shape[1]}×{image.shape[0]}"
+    print(prompt1)
+    # 定义请求的 URL
+    url = "https://api.sensenova.cn/v1/llm/chat-completions"
+
+    # 定义请求头
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_TOKEN}"
+    }
+
+    # 定义请求体
+    data = {
+        "model": model_id,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_base64",
+                        "image_base64": f"{base64_image}"
+                    },
+                    {
+                        "type": "text",
+                        "text": f"{prompt1}"
+                    }
+                ]
+            }
+        ],
+        "max_new_tokens": 4096,
+        "repetition_penalty": 1.0,
+        "stream": True,
+        "temperature": 0.8,
+        "top_p": 0.7,
+        "user": "string"
+    }
+
+    try:
+        # 发送 POST 请求
+        last_time = time.time()
+        print("requests sent")
+        response = requests.post(url, headers=headers, json=data, stream=False)
+
+        # 检查响应状态码
+        response.raise_for_status()
+
+        # 解析响应 JSON 数据
+        # response_data = response.json()
+
+        # 打印响应数据
+        # print(response_data)
+
+        result_text = ""
+        reasoning_text = ""
+        first = True
+        for line in response.iter_lines():
+            if first:
+                print("ttft ", time.time() - last_time)
+                first = False
+            if line.startswith(b"data:"):
+                # 去除 "data:" 前缀
+                json_data = line[5:].decode("utf-8")
+                if json_data == "[DONE]":
+                    break
+                try:
+                    data = json.loads(json_data)
+                    # print(data)
+                    delta = data["data"]["choices"][0]["delta"]
+                    if "reasoning_content" in data["data"]["choices"][0]:
+                        reasoning_content = data["data"]["choices"][0]["reasoning_content"]
+                    else:
+                        reasoning_content = ""
+                    reasoning_text += reasoning_content
+                    result_text += delta
+                    print(reasoning_content + delta, end="", flush=True)
+                    # print(delta, end=" ", flush=True)
+                except json.JSONDecodeError:
+                    print("Failed to decode JSON data:", json_data)
+            response.close()
+        print("all time", time.time() - last_time)
+
+
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}")
+    except Exception as err:
+        print(f"Other error occurred: {err}")
+
 
 if __name__ == '__main__':
-    get_decription_csv("pictures/real001.jpg", "data/doubao.csv")
+    get_location_sensenova()
+    # get_decription_csv("pictures/real001.jpg", "data/doubao.csv")
     # get_description_sensenova_v2("data/debug_split_0_0.jpg", "data/sensenova1.csv")
     # get_decription_csv_sensenova("data/debug_split_0.jpg", "data/sensenova_0.csv")
     # get_decription_csv_sensenova("data/debug_split_1.jpg", "data/sensenova_1.csv")
